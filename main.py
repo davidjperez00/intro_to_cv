@@ -5,6 +5,7 @@
 
 import numpy as np
 import cv2
+import matplotlib.pyplot as plt
 
 # @brief: Function to create a desired
 #     kernel for image processing
@@ -17,7 +18,6 @@ def kernel_selector():
 #    with pixel values in the range [0, 255]
 #    and a 3x3 kernel
 def preprocess_image(image):
-
   # Surround the outside of the image with 1 pixel layer of zeros
   image_padded = np.pad(image, (1, 1), 'constant', constant_values=(0, 0))
 
@@ -30,12 +30,8 @@ def apply_kernel_to_image(image, kernel):
   # Create a new image to store the result of the correlation operation
   # This image will have the same size as the original image
   output_image = np.zeros(image.shape, dtype=np.uint32)
-  print(output_image.shape)
 
   preproc_image = preprocess_image(image)
-
-  # # Surround the outside of the image with 1 pixel layer of zeros
-  # image_padded = np.pad(image, (1, 1), 'constant', constant_values=(0, 0))
 
   # Center for each pixel neighborhood indexes
   # not (0,0) since the image is padded (as for "- 1")
@@ -67,6 +63,84 @@ def apply_kernel_to_image(image, kernel):
       
   return output_image
 
+def compute_gradient_magnitude(image, kernel_row, kernel_col):
+  # Apply Sobel kernel to the image results in the partial derivative in the x and y direction
+  output_image_row = apply_kernel_to_image(image, kernel_row) 
+  output_image_col = apply_kernel_to_image(image, kernel_col)
+
+  # Square the partial derivatives pixel values
+  output_image_row_sqr = np.square(output_image_row)
+  output_image_col_sqr = np.square(output_image_col)
+
+  # Add the squared partial derivatives together
+  summed_pds_sqr = output_image_row_sqr + output_image_col_sqr
+
+  # Take the square root of the sum of the squared partial derivatives
+  output_mag = np.sqrt(summed_pds_sqr)
+
+  # remove decimal points and cast to 8 bit integer
+  output_mag = output_mag.astype(np.uint8)
+
+  return output_image_row, output_image_col, output_mag
+
+def compute_gradient_direction(gradient_x, gradient_y):
+  # Perform the calculation of the gradient direction
+  gradient_direction = np.arctan2(gradient_y, gradient_x)
+
+  # # Convert gradient direction to the range [0, 2*pi)
+  # gradient_direction[gradient_direction < 0] += 2 * np.pi
+
+  # # Normalize gradient direction to the range [0, 1] for colormap
+  # gradient_direction_normalized = gradient_direction / (2 * np.pi)
+
+
+  # # Normalize the gradient direction values to the range [0, 1]
+  # gradient_direction_normalized = (gradient_direction + np.pi) / (2 * np.pi)
+
+  # Normalize the gradient direction values to the range [0, 1]
+  gradient_direction_normalized = gradient_direction * ( 180 + np.pi) % 180
+
+  # # Convert the normalized gradient direction to RGB
+  # gradient_direction_color = plt.get_cmap('hsv')(gradient_direction_normalized)
+
+  # # Convert HSV to RGB
+  # gradient_direction_color_rgb = plt.get_cmap('hsv')(gradient_direction_color)
+
+  # Display the resulting image
+  fig, ax = plt.subplots(1, 1)
+  plt.imshow(gradient_direction_normalized)
+  plt.axis('off')
+  plt.show()
+
+  print("gradient_direction= ", gradient_direction)
+
+  return gradient_direction
+
+# @brief: Function to display the kernel correlation for a 
+#     given 2D image. 
+# @note: This implies that the kernel operation results in an image of the same size.
+def display_kernel_correlation(original_image, grad_x, grad_y, grad_mag):
+  # Create a figure to display a row of all 4 images
+  fig, ax = plt.subplots(1, 4)
+  ax[0].imshow(original_image, cmap='gray')
+  ax[0].set_title("Original Image")
+  ax[0].axis("off")
+
+  ax[1].imshow(grad_x, cmap='gray')
+  ax[1].set_title("Gradient X")
+  ax[1].axis("off")
+
+  ax[2].imshow(grad_y, cmap='gray')
+  ax[2].set_title("Gradient Y")
+  ax[2].axis("off")
+
+  ax[3].imshow(grad_mag, cmap='gray')
+  ax[3].set_title("Gradient Magnitude")
+  ax[3].axis("off")
+
+  # Create figure
+  # plt.show()
+
 # Create a main function
 def main():
 
@@ -74,60 +148,20 @@ def main():
 
   soble_kernel_row = (1/8) * np.array([[-1, 0, 1], [-2, 0, 2], [-1, 0, 1]])
   soble_kernel_col = (1/8) * np.array([[-1, -2, -1], [0, 0, 0], [1, 2, 1]])
-
   # soble_kernel_row = np.array([[-1, 0, 1], [-2, 0, 2], [-1, 0, 1]])
   # soble_kernel_col = np.array([[-1, -2, -1], [0, 0, 0], [1, 2, 1]])
 
-  # print("soble_kernel_row: \r\n", soble_kernel_row)
-  # print("soble_kernel_col: \r\n", soble_kernel_col)
-
-
-  # Apply Sobel kernel to the image results in the partial derivative in the x and y direction
-  output_image_row = apply_kernel_to_image(coin_img, soble_kernel_row)
-  output_image_col = apply_kernel_to_image(coin_img, soble_kernel_col)
-
-  # cv2.imshow('output Image', output_image_row)
-  # cv2.imshow("output_image_col", output_image_col)
-
-  print("output_image_row[0] type = ", type(output_image_row[0]))
-  print("output_image_row = ", output_image_row)
-  print("output_image_col = ", output_image_col)
-
-  # Square the partial derivatives and add them together
-  output_image_row = np.square(output_image_row)
-  output_image_col = np.square(output_image_col)
-
-  print("output_image_sqrd = ", output_image_row)
-  print("output_image_col_sqrd = ", output_image_col)
-
-  # Add the squared partial derivatives together
-  summed_pds = output_image_row + output_image_col
+  grad_row, grad_col, grad_mag = compute_gradient_magnitude(coin_img, soble_kernel_row, soble_kernel_col)
   
-  # Take the square root of the sum of the squared partial derivatives
-  summed_pds = np.sqrt(summed_pds)
+  # Display the effects of the kernel correlation on the image
+  display_kernel_correlation(coin_img, grad_row, grad_col, grad_mag)
 
-  # remove decimal points and cast to 8 bit integer
-  summed_pds = summed_pds.astype(np.uint8)
+  grad_direction = compute_gradient_direction(grad_row, grad_col)
 
-  print("summed_pds = ", summed_pds)
-  
-  # Print every row and column value
-  # for row in summed_pds:
-  #   for col in row:
-  #     print(col)
+  # cv2.imshow('Gradient Direction', grad_direction)
+  # cv2.show()
 
-  cv2.imshow("summed_pds", summed_pds)
-      
-  # print("coin_img_padded = ", coin_img_padded)
-  # cv2.imwrite("coin_img_padded.png", coin_img_padded)
-  # cv2.imwrite("coins5.png", coin_img_std5)
-  cv2.imshow("Original Image", coin_img)
-
-  # print("output_image = ", output_image)
-  print("output_image.shape = ", output_image_row.shape)
-  print("original image shape = ", coin_img.shape)
-
-
+  # Wait for a user response
   cv2.waitKey(0)
 
   return 0
